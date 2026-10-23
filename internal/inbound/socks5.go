@@ -26,16 +26,27 @@ type Socks5 struct {
 	Dial   Dialer
 	Log    *logx.Logger
 
+	// mu guards ln: Serve binds it while a caller may already be asking where the
+	// listener landed, which is what a test does with port 0.
+	mu sync.Mutex
 	ln net.Listener
 }
 
 // Addr is the address actually bound, which is useful when Listen asked for
-// port 0.
+// port 0. It is empty until Serve has bound.
 func (s *Socks5) Addr() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.ln == nil {
 		return ""
 	}
 	return s.ln.Addr().String()
+}
+
+func (s *Socks5) listener() net.Listener {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.ln
 }
 
 // Serve binds and accepts until the context is cancelled.
@@ -44,7 +55,9 @@ func (s *Socks5) Serve(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("listen on %s: %w", s.Listen, err)
 	}
+	s.mu.Lock()
 	s.ln = ln
+	s.mu.Unlock()
 	s.Log.Infof("socks5 listening on %s", ln.Addr())
 
 	go func() {
@@ -66,10 +79,11 @@ func (s *Socks5) Serve(ctx context.Context) error {
 
 // Close stops the listener.
 func (s *Socks5) Close() error {
-	if s.ln == nil {
+	ln := s.listener()
+	if ln == nil {
 		return nil
 	}
-	return s.ln.Close()
+	return ln.Close()
 }
 
 func (s *Socks5) handle(ctx context.Context, client net.Conn) {
