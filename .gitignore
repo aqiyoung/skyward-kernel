@@ -1,0 +1,9 @@
+# built binaries
+/skyward
+/skyward.exe
+/dist/
+
+# editors
+.idea/
+.vscode/
+*.swp

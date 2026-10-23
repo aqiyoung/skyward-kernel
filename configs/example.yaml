@@ -1,0 +1,37 @@
+# A profile small enough to read. Skyward's app hands over the YAML a
+# subscription carries; this one shows the keys the kernel reads today.
+mode: rule
+log-level: info
+
+proxies:
+  - name: ss-example
+    type: ss
+    server: 192.0.2.10
+    port: 8388
+    cipher: aes-256-gcm
+    password: correct-horse-battery-staple
+    udp: false
+
+  - name: trojan-example
+    type: trojan
+    server: example.com
+    port: 443
+    password: another-passphrase
+    sni: example.com
+    skip-cert-verify: false
+
+proxy-groups:
+  - name: Proxy
+    type: select
+    proxies:
+      - ss-example
+      - trojan-example
+      - DIRECT
+
+rules:
+  - DOMAIN-SUFFIX,local,DIRECT
+  - IP-CIDR,127.0.0.0/8,DIRECT,no-resolve
+  - IP-CIDR,192.168.0.0/16,DIRECT,no-resolve
+  - DOMAIN-SUFFIX,example.com,Proxy
+  - DOMAIN-KEYWORD,doubleclick,REJECT
+  - MATCH,Proxy
